@@ -1,0 +1,20 @@
+{
+  "extends": "../tsconfig-base.json",
+  "references": [
+    {
+      "path": "../discovery-client"
+    },
+    {
+      "path": "../shared-data"
+    }
+  ],
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "outDir": "lib",
+    "paths": {
+      "/app/*": ["../app/src/*"]
+    }
+  },
+  "include": ["typings", "src"]
+}
