@@ -168,6 +168,10 @@ class UserDetails(BaseModel):
     status: Literal["ok", "error"]
     user: Any
 
+class ChatHistory(BaseModel):
+    status: Literal["ok", "error"]
+    history: Any
+
 class ErrorResponse(BaseModel):
     message: str
 
@@ -259,14 +263,44 @@ async def get_health(request: Request) -> Status:
         logger.info(f"{request.method} {request.url.path}", extra={"requestMethod": request.method, "requestPath": request.url.path})
     return Status(status="ok", version=settings.dd_version)
 
+@app.get("/api/chathistory",response_model=ChatHistory,summary="Return Chat History",description="Return Chat History")
+async def get_chathistory(auth_result: Any = Security(auth.verify)) -> ChatHistory:
+    """
+    This api return organizaion chat history
 
-@app.get(
-    "/userinfo",
-    response_model=UserDetails,
-    summary="Return User Details",
-    description="Return User Details",
-    include_in_schema=False,
-)
+    - **returns**: array of chat history for a organization
+    """
+    response = []
+    user_id = auth_result["sub"]
+    ddbResponse = table1.scan(
+        ProjectionExpression= 'id,org_name',
+        FilterExpression='userId = :value',
+        ExpressionAttributeValues={
+            ':value': user_id
+        },
+        Limit=1
+    )
+    if len(ddbResponse['Items']) > 0:
+        org=ddbResponse['Items'][0]
+        org_id = org['id']
+        ddbHistoryResponse = table.scan(
+            FilterExpression='org_id = :value',
+            ExpressionAttributeValues={
+                ':value': org_id
+            }
+        )
+        response = ddbHistoryResponse["Items"]
+    else:
+        return ChatHistory(
+            status="error", 
+            history=[]
+        )
+    return ChatHistory(
+        status="ok", 
+        history=response
+    )
+
+
 @app.get("/api/userinfo", response_model=UserDetails, summary="User Details", description="Return User Details.")
 async def get_userinfo(request: Request, auth_result: Any = Security(auth.verify)) -> UserDetails:
     """
@@ -289,8 +323,6 @@ async def get_userinfo(request: Request, auth_result: Any = Security(auth.verify
             org=response['Items'][0]
             org_id = org['id']
             user_id = auth_result["sub"]
-            print(org_id)
-            print(auth_result)
             token_url = f'https://{settings.Auth0Domain}/oauth/token'
             payload = {
                 'grant_type': 'client_credentials',
@@ -298,25 +330,22 @@ async def get_userinfo(request: Request, auth_result: Any = Security(auth.verify
                 'client_secret': settings.Auth0ClientSecret,
                 'audience': 'https://'+settings.Auth0Domain+'/api/v2/'
             }
-            response1 = requests.post(token_url, json=payload)
-            print(response1)
-            if response1.status_code == 200:
-                access_token = response1.json()['access_token']
+            authResponse = requests.post(token_url, json=payload)
+            if authResponse.status_code == 200:
+                access_token = authResponse.json()['access_token']
                 api_base_url = f'https://{settings.Auth0Domain}/api/v2/'
                 headers = {'Authorization': f'Bearer {access_token}'}
-                print(api_base_url)
                 add_member_url = f'{api_base_url}organizations/{org_id}/members'
-                print(add_member_url)
-                payload = {'members':[user_id]}
-                print(payload)
-                response2 = requests.post(add_member_url, headers=headers, json=payload)
-                print(response2)
-                if response2.status_code == 201:
+                payload = {
+                    'members':[user_id]
+                }
+                addMemberResponse = requests.post(add_member_url, headers=headers, json=payload)
+                if addMemberResponse.status_code == 201:
                     print("Member added successfully")
                 else:
-                    print(f"Error: {response2.text}")
+                    print(f"Error: {addMemberResponse.text}")
             else:
-                print(f"Error: {response1.text}")
+                print(f"Error: {authResponse.text}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
     return UserDetails(status="ok", user=org)

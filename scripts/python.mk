@@ -1,7 +1,7 @@
 # This environment variable can be used to select a specific
 # Python executable to use to run pipenv. Note: pipenv will not
 # necessary select this Python to create its virtual environments.
-OT_PYTHON ?= python
+OT_PYTHON ?= python3
 
 # This environment variable can be used to tell pipenv which
 # Python version to use for a project's virtual environment.
