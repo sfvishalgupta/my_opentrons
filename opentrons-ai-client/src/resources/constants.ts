@@ -19,7 +19,7 @@ export const PROD_AUTH0_AUDIENCE = 'https://*.arc-saas.net'
 // auth0 for local
 export const LOCAL_AUTH0_AUDIENCE = 'http://localhost:5173'
 
-export const CLIENT_MAX_WIDTH = '1440px'
+export const CLIENT_MAX_WIDTH = '2000px'
 
 export const API_GATEWAY_DOMAIN = "https://h7a82dp9ri.execute-api.ap-south-1.amazonaws.com/dev/users";
 export const API_GATEWAY_KEY = "4ZdrnK5j2B4ZbdmD36Bm9KQJ4uxrWrh5ujJrMA1c";

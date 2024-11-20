@@ -48,6 +48,7 @@ app = FastAPI(
     description="An API for generating chat responses.",
     version=os.getenv("DD_VERSION", "local"),
     openapi_url="/api/openapi.json",
+    timeout=60
 )
 
 dynamodb = boto3.resource(
@@ -78,6 +79,7 @@ app.add_middleware(
     allow_credentials=ALLOWED_CREDENTIALS,
     allow_methods=ALLOWED_METHODS,
     allow_headers=ALLOWED_HEADERS,
+    
 )
 
 
