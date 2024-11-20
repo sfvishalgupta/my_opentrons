@@ -10,15 +10,11 @@ interface UseGetAccessTokenResult {
 export const useGetAccessToken = (): UseGetAccessTokenResult => {
   const { getAccessTokenSilently } = useAuth0()
 
-  const auth0Audience = (): string => {
-    return PROD_AUTH0_AUDIENCE
-  }
-
   const getAccessToken = async (): Promise<string> => {
     try {
       const accessToken = await getAccessTokenSilently({
         authorizationParams: {
-          audience: auth0Audience(),
+          
         },
       })
       return accessToken

@@ -1,6 +1,7 @@
 // ToDo (kk:05/29/2024) this should be switched by env var
 
-const SERVER_URL = "https://opentrons-poc-64340737.ap-south-1.elb.amazonaws.com"
+// const SERVER_URL = "https://opentrons-poc-64340737.ap-south-1.elb.amazonaws.com"
+const SERVER_URL = "https://opentronsapi.arc-saas.net"
 // const SERVER_URL = "http://localhost:8000"
 
 export const PROD_END_POINT = SERVER_URL + '/api/chat/completion'

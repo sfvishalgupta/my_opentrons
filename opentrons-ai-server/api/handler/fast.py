@@ -67,10 +67,9 @@ ALLOWED_ACCESS_CONTROL_MAX_AGE: str = "600"
 
 # Add CORS middleware
 origins = [
-    "http://localhost.tiangolo.com",
     "https://*.arc-saas.net",
     "http://localhost",
-    "http://localhost:8080",
+    "http://localhost:5137",
 ]
 
 app.add_middleware(
