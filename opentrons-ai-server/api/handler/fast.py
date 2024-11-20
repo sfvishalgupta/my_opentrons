@@ -322,6 +322,7 @@ async def get_userinfo(request: Request, auth_result: Any = Security(auth.verify
         ref = get_refer(request)
         org = get_org(ref)
         if org:
+            org["name"] = auth_result["name"]
             org_id = org["id"]
             user_id = auth_result["sub"]
             token_url = f"https://{settings.Auth0Domain}/oauth/token"
