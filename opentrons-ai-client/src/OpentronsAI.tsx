@@ -16,20 +16,38 @@ import { useGetAccessToken } from './resources/hooks'
 import { initializeMixpanel } from './analytics/mixpanel'
 import { useTrackEvent } from './resources/hooks/useTrackEvent'
 import { Header } from './molecules/Header'
-import { CLIENT_MAX_WIDTH } from './resources/constants'
+import { CLIENT_MAX_WIDTH, PROD_GET_USER_DETAILS_END_POINT } from './resources/constants'
 import { Footer } from './molecules/Footer'
 import { HeaderWithMeter } from './molecules/HeaderWithMeter'
 import styled from 'styled-components'
 import { ExitConfirmModal } from './molecules/ExitConfirmModal'
 
 export function OpentronsAI(): JSX.Element | null {
-  const { isAuthenticated, isLoading, loginWithRedirect } = useAuth0()
+  const { isAuthenticated, isLoading, user, loginWithRedirect, getIdTokenClaims } = useAuth0()
   const [, setToken] = useAtom(tokenAtom)
   const [{ displayHeaderWithMeter, progress }] = useAtom(headerWithMeterAtom)
   const [mixpanelState, setMixpanelState] = useAtom(mixpanelAtom)
   const { getAccessToken } = useGetAccessToken()
   const trackEvent = useTrackEvent()
-
+  const saveUserOrganization = async (): Promise<void> => {
+    if (user != null) {
+      const claim = await getIdTokenClaims();
+      const jwtToken = claim ?? { __raw: "" };
+      const headers = {
+        Authorization: `Bearer ${jwtToken.__raw}`,
+        'Content-Type': 'application/json',
+      }
+      const config = {
+        method: 'GET',
+        headers
+      }
+      const response = await fetch(PROD_GET_USER_DETAILS_END_POINT, config)
+      const data = await response.json();
+      user.orgData = data.user;
+      localStorage.setItem("userInfo", JSON.stringify(user));
+      // }
+    }
+  }
   const fetchAccessToken = async (): Promise<void> => {
     try {
       const accessToken = await getAccessToken()
@@ -49,6 +67,8 @@ export function OpentronsAI(): JSX.Element | null {
       void loginWithRedirect()
     }
     if (isAuthenticated) {
+      console.log("This is the place ......");
+      void saveUserOrganization();
       void fetchAccessToken()
     }
   }, [isAuthenticated, isLoading, loginWithRedirect])
@@ -68,40 +88,41 @@ export function OpentronsAI(): JSX.Element | null {
   }
 
   return (
-    <Flex
-      id="opentrons-ai"
-      width={'100%'}
-      height={'100vh'}
-      flexDirection={DIRECTION_COLUMN}
-    >
-      <StickyHeader>
-        {displayHeaderWithMeter ? (
-          <HeaderWithMeter progressPercentage={progress} />
-        ) : (
-          <Header />
-        )}
-      </StickyHeader>
-
+    <HashRouter>
       <Flex
-        flex={1}
+        id="opentrons-ai"
+        width={'100%'}
+        height={'100vh'}
         flexDirection={DIRECTION_COLUMN}
-        backgroundColor={COLORS.grey10}
-        overflow={OVERFLOW_AUTO}
       >
+        <StickyHeader>
+          {displayHeaderWithMeter ? (
+            <HeaderWithMeter progressPercentage={progress} />
+          ) : (
+            <Header />
+          )}
+        </StickyHeader>
+
         <Flex
-          width="100%"
-          maxWidth={CLIENT_MAX_WIDTH}
-          alignSelf={ALIGN_CENTER}
           flex={1}
+          flexDirection={DIRECTION_COLUMN}
+          backgroundColor={COLORS.grey10}
+          overflow={OVERFLOW_AUTO}
         >
-          <HashRouter>
+          <Flex
+            width="100%"
+            maxWidth={CLIENT_MAX_WIDTH}
+            alignSelf={ALIGN_CENTER}
+            flex={1}
+          >
             <ExitConfirmModal />
             <OpentronsAIRoutes />
-          </HashRouter>
+
+          </Flex>
+          <Footer />
         </Flex>
-        <Footer />
       </Flex>
-    </Flex>
+    </HashRouter>
   )
 }
 

@@ -8,29 +8,17 @@ import { i18n } from './i18n'
 import { App } from './App'
 import {
   AUTH0_DOMAIN,
-  LOCAL_AUTH0_DOMAIN,
   PROD_AUTH0_CLIENT_ID,
-  STAGING_AUTH0_CLIENT_ID,
-  LOCAL_AUTH0_CLIENT_ID,
 } from './resources/constants'
 
 const rootElement = document.getElementById('root')
 
 const getClientId = (): string => {
-  switch (process.env.NODE_ENV) {
-    case 'production':
-      return PROD_AUTH0_CLIENT_ID
-    case 'development':
-      return LOCAL_AUTH0_CLIENT_ID
-    default:
-      return STAGING_AUTH0_CLIENT_ID
-  }
+  return PROD_AUTH0_CLIENT_ID
 }
 
 const getDomain = (): string => {
-  return process.env.NODE_ENV === 'development'
-    ? LOCAL_AUTH0_DOMAIN
-    : AUTH0_DOMAIN
+  return AUTH0_DOMAIN
 }
 
 if (rootElement != null) {

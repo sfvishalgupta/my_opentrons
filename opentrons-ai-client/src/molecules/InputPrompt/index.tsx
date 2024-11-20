@@ -20,18 +20,16 @@ import {
   chatDataAtom,
   chatHistoryAtom,
   chatPromptAtom,
-  tokenAtom,
 } from '../../resources/atoms'
 import { useApiCall } from '../../resources/hooks'
 import { calcTextAreaHeight } from '../../resources/utils/utils'
 import {
-  STAGING_END_POINT,
   PROD_END_POINT,
-  LOCAL_END_POINT,
 } from '../../resources/constants'
 
 import type { AxiosRequestConfig } from 'axios'
 import type { ChatData } from '../../resources/types'
+import { useAuth0 } from '@auth0/auth0-react'
 
 export function InputPrompt(): JSX.Element {
   const { t } = useTranslation('protocol_generator')
@@ -39,12 +37,12 @@ export function InputPrompt(): JSX.Element {
   const [chatPromptAtomValue] = useAtom(chatPromptAtom)
   const [, setChatData] = useAtom(chatDataAtom)
   const [chatHistory, setChatHistory] = useAtom(chatHistoryAtom)
-  const [token] = useAtom(tokenAtom)
   const [submitted, setSubmitted] = useState<boolean>(false)
   const userPrompt = watch('userPrompt') ?? ''
   const { data, isLoading, callApi } = useApiCall()
   const [requestId, setRequestId] = useState<string>(uuidv4())
 
+  const { getIdTokenClaims } = useAuth0();
   // This is to autofill the input field for when we navigate to the chat page from the existing/new protocol generator pages
   useEffect(() => {
     setValue('userPrompt', chatPromptAtomValue)
@@ -56,6 +54,7 @@ export function InputPrompt(): JSX.Element {
 
   const handleClick = async (): Promise<void> => {
     setRequestId(uuidv4())
+    const jwtToken = await getIdTokenClaims() ?? { __raw: "" };
     const userInput: ChatData = {
       requestId,
       role: 'user',
@@ -66,23 +65,15 @@ export function InputPrompt(): JSX.Element {
 
     try {
       const headers = {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${jwtToken.__raw}`,
         'Content-Type': 'application/json',
       }
 
       const getEndpoint = (): string => {
-        switch (process.env.NODE_ENV) {
-          case 'production':
-            return PROD_END_POINT
-          case 'development':
-            return LOCAL_END_POINT
-          default:
-            return STAGING_END_POINT
-        }
+        return PROD_END_POINT
       }
 
       const url = getEndpoint()
-
       const config = {
         url,
         method: 'POST',
@@ -90,7 +81,7 @@ export function InputPrompt(): JSX.Element {
         data: {
           message: userPrompt,
           history: chatHistory,
-          fake: false,
+          fake: false
         },
       }
       setChatHistory(chatHistory => [

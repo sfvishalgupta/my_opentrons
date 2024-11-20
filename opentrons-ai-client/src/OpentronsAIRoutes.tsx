@@ -5,6 +5,7 @@ import { UpdateProtocol } from './organisms/UpdateProtocol'
 import type { RouteProps } from './resources/types'
 import { Chat } from './pages/Chat'
 import { CreateProtocol } from './pages/CreateProtocol'
+import { ChatHistory } from './pages/ChatHistory'
 
 const opentronsAIRoutes: RouteProps[] = [
   {
@@ -12,6 +13,12 @@ const opentronsAIRoutes: RouteProps[] = [
     name: 'Chat',
     navLinkTo: '/chat',
     path: '/chat',
+  },
+  {
+    Component: ChatHistory,
+    name: 'ChatHistory',
+    navLinkTo: '/chat-history',
+    path: '/chat-history',
   },
   {
     Component: CreateProtocol,
@@ -25,6 +32,12 @@ const opentronsAIRoutes: RouteProps[] = [
     navLinkTo: '/update-protocol',
     path: '/update-protocol',
   },
+  {
+    Component: Landing,
+    name: 'Landing',
+    navLinkTo: '/landing',
+    path: '/landing',
+  }
 ]
 
 export function OpentronsAIRoutes(): JSX.Element {

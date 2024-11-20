@@ -10,6 +10,7 @@ import {
 } from '../../resources/atoms'
 import { ChatDisplay } from '../../molecules/ChatDisplay'
 import { ChatFooter } from '../../molecules/ChatFooter'
+import {SidePanel} from '../../molecules/SidePanel'
 import styled from 'styled-components'
 import { FeedbackModal } from '../../molecules/FeedbackModal'
 
@@ -39,13 +40,23 @@ export function Chat(): JSX.Element | null {
   }, [chatData.length, scrollToBottom])
 
   return (
+    
     <FormProvider {...methods}>
+      <Flex 
+          width="35%"
+          flexDirection={DIRECTION_COLUMN}
+          gridGap={SPACING.spacing24}>
+          <SidePanel>
+            
+          </SidePanel>
+        </Flex>
       <Flex
         padding={`${SPACING.spacing40} ${SPACING.spacing40} ${SPACING.spacing20}`}
         flexDirection={DIRECTION_COLUMN}
         gridGap={SPACING.spacing12}
         width="100%"
       >
+        
         <Flex
           width="100%"
           flexDirection={DIRECTION_COLUMN}
@@ -68,6 +79,7 @@ export function Chat(): JSX.Element | null {
         {showFeedbackModal ? <FeedbackModal /> : null}
       </Flex>
     </FormProvider>
+    
   )
 }
 

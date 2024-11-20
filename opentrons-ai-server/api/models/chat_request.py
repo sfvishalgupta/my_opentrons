@@ -30,4 +30,3 @@ class ChatRequest(BaseModel):
     history: HistoryType
     fake: bool = Field(True, description="When set to true, the response will be a fake. OpenAI API is not used.")
     fake_key: FakeKeyType
-    orgId: str

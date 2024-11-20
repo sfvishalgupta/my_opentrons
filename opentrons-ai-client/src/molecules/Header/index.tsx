@@ -1,6 +1,6 @@
+
 import { useTranslation } from 'react-i18next'
 import styled from 'styled-components'
-
 import {
   Flex,
   StyledText,
@@ -15,6 +15,7 @@ import {
 } from '@opentrons/components'
 import { useAuth0 } from '@auth0/auth0-react'
 import { CLIENT_MAX_WIDTH } from '../../resources/constants'
+import { useNavigate } from 'react-router-dom'
 import { useTrackEvent } from '../../resources/hooks/useTrackEvent'
 import { useAtom } from 'jotai'
 import { displayExitConfirmModalAtom } from '../../resources/atoms'
@@ -52,36 +53,56 @@ const LogoutOrExitButton = styled(LinkButton)`
   font-size: ${TYPOGRAPHY.fontSizeH3};
 `
 
+const MenuButton = styled(LinkButton)`
+  color: ${COLORS.grey50};
+  font-weight: bold;
+  margin: 0 10px;
+`
+
+const ProfileButton = styled(LinkButton)`
+  color: ${COLORS.grey50};
+  font-weight: bold;
+  margin: 0 10px;
+`
+
 interface HeaderProps {
   isExitButton?: boolean
 }
 
 export function Header({ isExitButton = false }: HeaderProps): JSX.Element {
+  const navigate = useNavigate()
   const { t } = useTranslation('protocol_generator')
   const { logout } = useAuth0()
   const trackEvent = useTrackEvent()
   const [, setDisplayExitConfirmModal] = useAtom(displayExitConfirmModalAtom)
+  const info = localStorage.getItem("userInfo") || '{"orgData":{}}';
+  const userInfo = JSON.parse(info);
 
   async function handleLoginOrExitClick(): Promise<void> {
     if (isExitButton) {
       setDisplayExitConfirmModal(true)
       return
     }
-
+    localStorage.removeItem('userInfo');
     await logout()
     trackEvent({ name: 'user-logout', properties: {} })
   }
-
   return (
     <HeaderBar>
       <HeaderBarContent>
         <Flex>
           <HeaderTitle>{t('opentrons')}</HeaderTitle>
           <HeaderGradientTitle>{t('ai')}</HeaderGradientTitle>
+          <MenuButton onClick={() => { navigate('/') }}>Home</MenuButton>
+          <MenuButton onClick={() => { navigate('/chat') }}>Chat</MenuButton>
+          <MenuButton onClick={() => { navigate('/chat-history') }}>History</MenuButton>
         </Flex>
+        <Flex>
+        <ProfileButton>{userInfo.name} (<b>{userInfo.orgData.org_name}</b>)</ProfileButton>
         <LogoutOrExitButton onClick={handleLoginOrExitClick}>
           {isExitButton ? t('exit') : t('logout')}
         </LogoutOrExitButton>
+        </Flex>
       </HeaderBarContent>
     </HeaderBar>
   )

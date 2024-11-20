@@ -51,13 +51,10 @@ app = FastAPI(
 )
 
 dynamodb = boto3.resource(
-    'dynamodb',
-    aws_access_key_id=settings.aws_access_key,
-    aws_secret_access_key=settings.aws_secret_key,
-    region_name=settings.aws_region
+    "dynamodb", aws_access_key_id=settings.aws_access_key, aws_secret_access_key=settings.aws_secret_key, region_name=settings.aws_region
 )
-table = dynamodb.Table(settings.ddb_table_history)
-table1 = dynamodb.Table(settings.ddb_table_tenants)
+tableHistory = dynamodb.Table(settings.ddb_table_history)
+tableTenants = dynamodb.Table(settings.ddb_table_tenants)
 
 
 # CORS and PREFLIGHT settings
@@ -83,6 +80,7 @@ app.add_middleware(
     allow_methods=ALLOWED_METHODS,
     allow_headers=ALLOWED_HEADERS,
 )
+
 
 # Add Timeout middleware
 class TimeoutMiddleware(BaseHTTPMiddleware):
@@ -164,13 +162,16 @@ class Status(BaseModel):
     status: Literal["ok", "error"]
     version: str
 
+
 class UserDetails(BaseModel):
     status: Literal["ok", "error"]
     user: Any
 
+
 class ChatHistory(BaseModel):
     status: Literal["ok", "error"]
     history: Any
+
 
 class ErrorResponse(BaseModel):
     message: str
@@ -192,6 +193,24 @@ class CorsHeadersResponse(BaseModel):
     Access_Control_Max_Age: str = Field(alias="Access-Control-Max-Age")
 
 
+def get_refer(request: Request):
+    referer = request.headers.get("Referer")
+    referer = referer.replace("https://", "").replace("http://", "").replace("/", "")
+    if referer == "localhost:5173":
+        referer = "opentrons-sf.arc-saas.net"
+    logger.info(f"Referer is : {referer}")
+    return referer
+
+
+def get_org(referer):
+    ddbResponse = tableTenants.scan(
+        ProjectionExpression="id,org_name", FilterExpression="subdomain = :value", ExpressionAttributeValues={":value": referer}
+    )
+    if len(ddbResponse["Items"]) > 0:
+        return ddbResponse["Items"][0]
+    return None
+
+
 @tracer.wrap()
 @app.post(
     "/api/chat/completion",
@@ -200,7 +219,7 @@ class CorsHeadersResponse(BaseModel):
     description="Generate a chat response based on the provided prompt.",
 )
 async def create_chat_completion(
-    body: ChatRequest, auth_result: Any = Security(auth.verify)  # noqa: B008
+    request: Request, body: ChatRequest, auth_result: Any = Security(auth.verify)  # noqa: B008
 ) -> Union[ChatResponse, ErrorResponse]:  # noqa: B008
     """
     Generate a chat completion response using OpenAI.
@@ -220,17 +239,21 @@ async def create_chat_completion(
                 fake: FakeResponse = get_fake_response(body.fake_key)
                 return ChatResponse(reply=fake.chat_response.reply, fake=fake.chat_response.fake)
             return ChatResponse(reply="Default fake response.  ", fake=body.fake)
+        ref = get_refer(request)
+        org = get_org(ref)
+        logger.info("Org found", extra=org)
+        if org:
+            tableHistory.put_item(
+                Item={
+                    "id": str(uuid.uuid4()),
+                    "org_id": org["id"],
+                    "user_id": auth_result["sub"],
+                    "user_name": auth_result["name"],
+                    "prompt": body.message,
+                    "created_on": datetime.today().strftime("%Y-%m-%d %H:%M:%S"),
+                }
+            )
         response: Union[str, None] = openai.predict(prompt=body.message, chat_completion_message_params=body.history)
-        table.put_item(
-            Item={
-              "id": str(uuid.uuid4()),
-              "org_id": body.orgId,
-              "user_id": auth_result['sub'],
-              "user_name": auth_result['name'],
-              "prompt": body.message,
-              "created_on": datetime.today().strftime('%Y-%m-%d %H:%M:%S')
-            }
-        )
         if response is None or response == "":
             return ChatResponse(reply="No response was generated", fake=body.fake)
 
@@ -242,6 +265,26 @@ async def create_chat_completion(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=InternalServerError(exception_object=e).model_dump()
         ) from e
 
+@app.get("/api/chat/history", response_model=ChatHistory, summary="Return Chat History", description="Return Chat History")
+async def get_chathistory(request: Request, auth_result: Any = Security(auth.verify)) -> ChatHistory:
+    """
+    This api return organization chat history
+
+    - **returns**: array of chat history for a organization
+    """
+    response = []
+    try:
+        ref = get_refer(request)
+        org = get_org(ref)
+        if org:
+            org_id = org["id"]
+            ddbHistoryResponse = tableHistory.scan(FilterExpression="org_id = :value", ExpressionAttributeValues={":value": org_id})
+            response = ddbHistoryResponse["Items"]
+        else:
+            return ChatHistory(status="error", history=[])
+    except Exception as e:
+        pass
+    return ChatHistory(status="ok", history=response)
 
 @app.get(
     "/health",
@@ -263,42 +306,8 @@ async def get_health(request: Request) -> Status:
         logger.info(f"{request.method} {request.url.path}", extra={"requestMethod": request.method, "requestPath": request.url.path})
     return Status(status="ok", version=settings.dd_version)
 
-@app.get("/api/chathistory",response_model=ChatHistory,summary="Return Chat History",description="Return Chat History")
-async def get_chathistory(auth_result: Any = Security(auth.verify)) -> ChatHistory:
-    """
-    This api return organizaion chat history
 
-    - **returns**: array of chat history for a organization
-    """
-    response = []
-    user_id = auth_result["sub"]
-    ddbResponse = table1.scan(
-        ProjectionExpression= 'id,org_name',
-        FilterExpression='userId = :value',
-        ExpressionAttributeValues={
-            ':value': user_id
-        },
-        Limit=1
-    )
-    if len(ddbResponse['Items']) > 0:
-        org=ddbResponse['Items'][0]
-        org_id = org['id']
-        ddbHistoryResponse = table.scan(
-            FilterExpression='org_id = :value',
-            ExpressionAttributeValues={
-                ':value': org_id
-            }
-        )
-        response = ddbHistoryResponse["Items"]
-    else:
-        return ChatHistory(
-            status="error", 
-            history=[]
-        )
-    return ChatHistory(
-        status="ok", 
-        history=response
-    )
+
 
 
 @app.get("/api/userinfo", response_model=UserDetails, summary="User Details", description="Return User Details.")
@@ -309,36 +318,25 @@ async def get_userinfo(request: Request, auth_result: Any = Security(auth.verify
     - **returns**: A Status containing the version of the API.
     """
     try:
-        referer = request.headers.get("Referer")
-        referer = referer.replace("https://", "").replace("http://", "").replace("/","")
-        response = table1.scan(
-            ProjectionExpression= 'id,org_name',
-            FilterExpression='subdomain = :value',
-            ExpressionAttributeValues={
-                ':value': referer
-            }
-        )
-        org={}
-        if len(response['Items']) > 0:
-            org=response['Items'][0]
-            org_id = org['id']
+        ref = get_refer(request)
+        org = get_org(ref)
+        if org:
+            org_id = org["id"]
             user_id = auth_result["sub"]
-            token_url = f'https://{settings.Auth0Domain}/oauth/token'
+            token_url = f"https://{settings.Auth0Domain}/oauth/token"
             payload = {
-                'grant_type': 'client_credentials',
-                'client_id': settings.Auth0ClientId,
-                'client_secret': settings.Auth0ClientSecret,
-                'audience': 'https://'+settings.Auth0Domain+'/api/v2/'
+                "grant_type": "client_credentials",
+                "client_id": settings.Auth0ClientId,
+                "client_secret": settings.Auth0ClientSecret,
+                "audience": "https://" + settings.Auth0Domain + "/api/v2/",
             }
             authResponse = requests.post(token_url, json=payload)
             if authResponse.status_code == 200:
-                access_token = authResponse.json()['access_token']
-                api_base_url = f'https://{settings.Auth0Domain}/api/v2/'
-                headers = {'Authorization': f'Bearer {access_token}'}
-                add_member_url = f'{api_base_url}organizations/{org_id}/members'
-                payload = {
-                    'members':[user_id]
-                }
+                access_token = authResponse.json()["access_token"]
+                api_base_url = f"https://{settings.Auth0Domain}/api/v2/"
+                headers = {"Authorization": f"Bearer {access_token}"}
+                add_member_url = f"{api_base_url}organizations/{org_id}/members"
+                payload = {"members": [user_id]}
                 addMemberResponse = requests.post(add_member_url, headers=headers, json=payload)
                 if addMemberResponse.status_code == 201:
                     print("Member added successfully")
@@ -444,6 +442,3 @@ async def catch_all_exceptions(request: Request, call_next: Any) -> JSONResponse
     except Exception as exc:
         logger.error(f"Unhandled error for route {request.url.path}: {exc}")
         return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"message": "Internal server error"})
-
-
-

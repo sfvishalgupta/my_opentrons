@@ -32,13 +32,13 @@ export function Landing(): JSX.Element | null {
   }, [setHeaderWithMeterAtom])
 
   function handleCreateNewProtocol(): void {
-    trackEvent({ name: 'create-new-protocol', properties: {} })
-    navigate('/new-protocol')
+    trackEvent({ name: 'chat', properties: {} })
+    navigate('/chat')
   }
 
   function handleUpdateProtocol(): void {
-    trackEvent({ name: 'update-protocol', properties: {} })
-    navigate('/update-protocol')
+    trackEvent({ name: 'chat-history', properties: {} })
+    navigate('/chat-history')
   }
 
   return (
@@ -78,11 +78,11 @@ export function Landing(): JSX.Element | null {
         {!isMobile && (
           <>
             <LargeButton
-              buttonText={t('landing_page_button_new_protocol')}
+              buttonText={t('landing_page_chat')}
               onClick={handleCreateNewProtocol}
             />
             <LargeButton
-              buttonText={t('landing_page_button_update_protocol')}
+              buttonText={t('landing_page_history')}
               buttonType="stroke"
               onClick={handleUpdateProtocol}
             />
