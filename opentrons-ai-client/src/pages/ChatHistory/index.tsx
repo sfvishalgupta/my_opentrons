@@ -5,11 +5,18 @@ import { useAuth0 } from '@auth0/auth0-react'
 import { PROD_HISTORY_END_POINT } from '../../resources/constants'
 import './table.css';
 
+interface HistoryData {
+  user_id: string;
+  user_name: string;
+  created_on: string;
+  prompt: string;
+}
+
 export function ChatHistory(): JSX.Element | null {
   const { getIdTokenClaims } = useAuth0()
-  const [data, setData] = useState([]);
+  const [data, setData] = useState<HistoryData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error] = useState(null);
+  const [error] = useState({message: ''});
   const [sort] = useState({ column: 'created_on', order: 'desc' });
 
   const fetchHistory = useCallback(async (): Promise<void> => {
@@ -25,7 +32,7 @@ export function ChatHistory(): JSX.Element | null {
     }
     const response = await fetch(PROD_HISTORY_END_POINT, config)
     const json = await response.json();
-    setData(json.history)
+    setData(json.history as HistoryData[])
     setLoading(false)
   }, []);
 
@@ -38,15 +45,15 @@ export function ChatHistory(): JSX.Element | null {
     return <p>Loading...</p>;
   }
 
-  if (error) {
-    return <p>Error: {error.message}</p>;
+  if (error.message !== "") {
+    return <p>Error: {error?.message}</p>;
   }
 
   const sortedData = data.sort((a, b) => {
     if (sort.order === 'asc') {
-      return a[sort.column] > b[sort.column] ? 1 : -1;
+      return a.created_on > b.created_on ? 1 : -1;
     } else {
-      return a[sort.column] < b[sort.column] ? 1 : -1;
+      return a.created_on < b.created_on ? 1 : -1;
     }
   });
 

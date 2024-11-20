@@ -1,0 +1,25 @@
+/* table.css */
+.table {
+  border-collapse: collapse;
+  width: 100%;
+  background-color: #f0f0f0;
+}
+
+.table th {
+  background-color: #333;
+  color: #fff;
+  padding: 10px;
+}
+
+.table td {
+  padding: 10px;
+  background-color: #f9f9f9;
+}
+
+.table tbody tr:nth-child(odd)  td{
+  background-color: #D0E6FE;
+}
+
+.table tbody tr:nth-child(even)  td{
+  background-color: #DEDEDE;
+}

@@ -16,38 +16,19 @@ import { useGetAccessToken } from './resources/hooks'
 import { initializeMixpanel } from './analytics/mixpanel'
 import { useTrackEvent } from './resources/hooks/useTrackEvent'
 import { Header } from './molecules/Header'
-import { CLIENT_MAX_WIDTH, PROD_GET_USER_DETAILS_END_POINT } from './resources/constants'
+import { CLIENT_MAX_WIDTH } from './resources/constants'
 import { Footer } from './molecules/Footer'
 import { HeaderWithMeter } from './molecules/HeaderWithMeter'
 import styled from 'styled-components'
 import { ExitConfirmModal } from './molecules/ExitConfirmModal'
 
 export function OpentronsAI(): JSX.Element | null {
-  const { isAuthenticated, isLoading, user, loginWithRedirect, getIdTokenClaims } = useAuth0()
+  const { isAuthenticated, isLoading, loginWithRedirect } = useAuth0()
   const [, setToken] = useAtom(tokenAtom)
   const [{ displayHeaderWithMeter, progress }] = useAtom(headerWithMeterAtom)
   const [mixpanelState, setMixpanelState] = useAtom(mixpanelAtom)
   const { getAccessToken } = useGetAccessToken()
   const trackEvent = useTrackEvent()
-  const saveUserOrganization = async (): Promise<void> => {
-    if (user != null) {
-      const claim = await getIdTokenClaims();
-      const jwtToken = claim ?? { __raw: "" };
-      const headers = {
-        Authorization: `Bearer ${jwtToken.__raw}`,
-        'Content-Type': 'application/json',
-      }
-      const config = {
-        method: 'GET',
-        headers
-      }
-      const response = await fetch(PROD_GET_USER_DETAILS_END_POINT, config)
-      const data = await response.json();
-      user.orgData = data.user;
-      localStorage.setItem("userInfo", JSON.stringify(user));
-      // }
-    }
-  }
   const fetchAccessToken = async (): Promise<void> => {
     try {
       const accessToken = await getAccessToken()
@@ -67,8 +48,6 @@ export function OpentronsAI(): JSX.Element | null {
       void loginWithRedirect()
     }
     if (isAuthenticated) {
-      console.log("This is the place ......");
-      void saveUserOrganization();
       void fetchAccessToken()
     }
   }, [isAuthenticated, isLoading, loginWithRedirect])

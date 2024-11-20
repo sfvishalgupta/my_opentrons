@@ -1,4 +1,5 @@
 
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next'
 import styled from 'styled-components'
 import {
@@ -13,8 +14,8 @@ import {
   JUSTIFY_CENTER,
   JUSTIFY_SPACE_BETWEEN,
 } from '@opentrons/components'
-import { useAuth0 } from '@auth0/auth0-react'
-import { CLIENT_MAX_WIDTH } from '../../resources/constants'
+import { useAuth0, } from '@auth0/auth0-react'
+import { CLIENT_MAX_WIDTH, PROD_GET_USER_DETAILS_END_POINT } from '../../resources/constants'
 import { useNavigate } from 'react-router-dom'
 import { useTrackEvent } from '../../resources/hooks/useTrackEvent'
 import { useAtom } from 'jotai'
@@ -72,21 +73,47 @@ interface HeaderProps {
 export function Header({ isExitButton = false }: HeaderProps): JSX.Element {
   const navigate = useNavigate()
   const { t } = useTranslation('protocol_generator')
-  const { logout } = useAuth0()
+  const { logout, getIdTokenClaims, user } = useAuth0()
   const trackEvent = useTrackEvent()
   const [, setDisplayExitConfirmModal] = useAtom(displayExitConfirmModalAtom)
-  const info = localStorage.getItem("userInfo") || '{"orgData":{}}';
-  const userInfo = JSON.parse(info);
+  const [data, setData] = useState<UserData>();
+  interface UserData {
+    id: string;
+    name: string;
+    org_name: string;
+  }
 
+  const fetchUserInfo = useCallback(async (): Promise<void> => {
+    if (user != null) {
+      const claim = await getIdTokenClaims();
+      const jwtToken = claim ?? { __raw: "" };
+      const headers = {
+        Authorization: `Bearer ${jwtToken.__raw}`,
+        'Content-Type': 'application/json',
+      }
+      const config = {
+        method: 'GET',
+        headers
+      }
+      const response = await fetch(PROD_GET_USER_DETAILS_END_POINT, config)
+      const json = await response.json();
+      const userinfo: UserData = json.user;
+      setData(userinfo)
+    }
+  }, [getIdTokenClaims, user]);
+
+  useEffect(() => {
+    fetchUserInfo()
+  }, [fetchUserInfo]);
   async function handleLoginOrExitClick(): Promise<void> {
     if (isExitButton) {
       setDisplayExitConfirmModal(true)
       return
     }
-    localStorage.removeItem('userInfo');
     await logout()
     trackEvent({ name: 'user-logout', properties: {} })
   }
+
   return (
     <HeaderBar>
       <HeaderBarContent>
@@ -98,7 +125,7 @@ export function Header({ isExitButton = false }: HeaderProps): JSX.Element {
           <MenuButton onClick={() => { navigate('/chat-history') }}>History</MenuButton>
         </Flex>
         <Flex>
-        <ProfileButton>{userInfo.name} (<b>{userInfo.orgData.org_name}</b>)</ProfileButton>
+        <ProfileButton>{user?.name} (<b>{data?.org_name}</b>)</ProfileButton>
         <LogoutOrExitButton onClick={handleLoginOrExitClick}>
           {isExitButton ? t('exit') : t('logout')}
         </LogoutOrExitButton>
