@@ -171,7 +171,7 @@ class UserDetails(BaseModel):
 
 class OrgMembers(BaseModel):
     status: Literal["ok", "error"]
-    members: [Any]
+    members: Any
     
 class ChatHistory(BaseModel):
     status: Literal["ok", "error"]
