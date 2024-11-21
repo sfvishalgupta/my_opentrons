@@ -56,6 +56,7 @@ dynamodb = boto3.resource(
 )
 tableHistory = dynamodb.Table(settings.ddb_table_history)
 tableTenants = dynamodb.Table(settings.ddb_table_tenants)
+tableOrgMembers = dynamodb.Table(settings.ddb_table_org_members)
 
 
 # CORS and PREFLIGHT settings
@@ -168,7 +169,10 @@ class UserDetails(BaseModel):
     status: Literal["ok", "error"]
     user: Any
 
-
+class OrgMembers(BaseModel):
+    status: Literal["ok", "error"]
+    members: [Any]
+    
 class ChatHistory(BaseModel):
     status: Literal["ok", "error"]
     history: Any
@@ -307,9 +311,24 @@ async def get_health(request: Request) -> Status:
         logger.info(f"{request.method} {request.url.path}", extra={"requestMethod": request.method, "requestPath": request.url.path})
     return Status(status="ok", version=settings.dd_version)
 
+@app.get("/api/orgmembers", response_model=OrgMembers, summary="Members Details", description="Return User Details.")
+async def get_orgmembers(request: Request, auth_result: Any = Security(auth.verify)) -> OrgMembers:
+    """
+    Perform a health check of the API.
 
-
-
+    - **returns**: A Status containing the version of the API.
+    """
+    try:
+        ref = get_refer(request)
+        org = get_org(ref)
+        if org:
+            org_id = org["id"]
+            ddbResponse = tableOrgMembers.scan(FilterExpression="org_id = :value", ExpressionAttributeValues={":value": org_id})
+            return OrgMembers(status="ok", members=ddbResponse["Items"])
+        else:
+            return OrgMembers(status="error", members=[])
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 @app.get("/api/userinfo", response_model=UserDetails, summary="User Details", description="Return User Details.")
 async def get_userinfo(request: Request, auth_result: Any = Security(auth.verify)) -> UserDetails:
@@ -341,6 +360,15 @@ async def get_userinfo(request: Request, auth_result: Any = Security(auth.verify
                 payload = {"members": [user_id]}
                 addMemberResponse = requests.post(add_member_url, headers=headers, json=payload)
                 if addMemberResponse.status_code == 201:
+                    tableOrgMembers.put_item(
+                        Item={
+                            "user_id": user_id,
+                            "org_id": org_id,
+                            "org_name": org["org_name"],
+                            "name": auth_result["name"],
+                            "email": auth_result["email"]
+                        }
+                    )
                     print("Member added successfully")
                 else:
                     print(f"Error: {addMemberResponse.text}")

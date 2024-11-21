@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     db_type: str = os.getenv("DB_TYPE")
     ddb_table_history: str = os.getenv("DDB_TABLE_HISTORY", "")
     ddb_table_tenants: str = os.getenv("DDB_TABLE_TENANTS", "")
+    ddb_table_org_members: str = os.getenv("DDB_TABLE_ORG_MEMBERS", "")
     aws_access_key: str = os.getenv("AWS_ACCESS_KEY_ID", "")
     aws_secret_key: str = os.getenv("AWS_SECRET_ACCESS_KEY", "")
     aws_region: str = os.getenv("AWS_REGION_NAME", "us-east-1")

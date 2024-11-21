@@ -18,8 +18,11 @@
 
 .table tbody tr:nth-child(odd)  td{
   background-color: #D0E6FE;
+  text-align: center;
 }
 
 .table tbody tr:nth-child(even)  td{
   background-color: #DEDEDE;
+  text-align: center;
 }
+
