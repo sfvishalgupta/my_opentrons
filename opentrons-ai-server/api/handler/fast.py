@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field, conint
 from starlette.middleware.base import BaseHTTPMiddleware
 from uvicorn.protocols.utils import get_path_with_query_string
 from datetime import datetime
+from urllib.parse import urlparse
 
 
 from api.domain.fake_responses import FakeResponse, get_fake_response
@@ -199,12 +200,18 @@ class CorsHeadersResponse(BaseModel):
 
 
 def get_refer(request: Request):
-    referer = request.headers.get("Referer")
-    referer = referer.replace("https://", "").replace("http://", "").replace("/", "")
-    if referer == "localhost:5173":
-        referer = "opentrons-sf.arc-saas.net"
-    logger.info(f"Referer is : {referer}")
-    return referer
+    ref = request.headers.get("Referer")
+    parsed_url = urlparse(ref)
+    domain_name = parsed_url.netloc
+    
+    # Remove 'www.' if present
+    if domain_name.startswith('www.'):
+        domain_name = domain_name[4:]
+    
+    if domain_name == "localhost:5173" or domain_name == "localhost:8000": 
+        domain_name = "opentrons-sourcefuse.arc-saas.net"
+    logger.info(f"Referer is : {domain_name}")
+    return domain_name
 
 
 def get_org(referer):
@@ -323,7 +330,29 @@ async def get_orgmembers(request: Request, auth_result: Any = Security(auth.veri
         org = get_org(ref)
         if org:
             org_id = org["id"]
-            ddbResponse = tableOrgMembers.scan(FilterExpression="org_id = :value", ExpressionAttributeValues={":value": org_id})
+            token_url = f"https://{settings.Auth0Domain}/oauth/token"
+            payload = {
+                "grant_type": "client_credentials",
+                "client_id": settings.Auth0ClientId,
+                "client_secret": settings.Auth0ClientSecret,
+                "audience": "https://" + settings.Auth0Domain + "/api/v2/",
+            }
+            authResponse = requests.post(token_url, json=payload)
+            if authResponse.status_code == 200:
+                access_token = authResponse.json()["access_token"]
+                api_base_url = f"https://{settings.Auth0Domain}/api/v2/"
+                list_member_url = f"{api_base_url}organizations/{org_id}/members"
+                headers = {"Authorization": f"Bearer {access_token}"}
+                params = {"page": 0, "per_page": 100}  # Pagination parameters
+                response = requests.get(list_member_url, headers=headers, params=params)
+                members = response.json()
+                while response.links.get("next"):
+                    params["page"] += 1
+                    response = requests.get(list_member_url, headers=headers, params=params)
+                    members.extend(response.json())
+                return OrgMembers(status="ok", members=members)
+                
+            ddbResponse = tableOrgMembers.scan(ProjectionExpression="user_id,email,name",FilterExpression="org_id = :value", ExpressionAttributeValues={":value": org_id})
             return OrgMembers(status="ok", members=ddbResponse["Items"])
         else:
             return OrgMembers(status="error", members=[])
@@ -360,18 +389,18 @@ async def get_userinfo(request: Request, auth_result: Any = Security(auth.verify
                 payload = {"members": [user_id]}
                 addMemberResponse = requests.post(add_member_url, headers=headers, json=payload)
                 if addMemberResponse.status_code == 201:
-                    tableOrgMembers.put_item(
-                        Item={
-                            "user_id": user_id,
-                            "org_id": org_id,
-                            "org_name": org["org_name"],
-                            "name": auth_result["name"],
-                            "email": auth_result["email"]
-                        }
-                    )
                     print("Member added successfully")
                 else:
                     print(f"Error: {addMemberResponse.text}")
+                tableOrgMembers.put_item(
+                    Item={
+                        "user_id": user_id,
+                        "org_id": org_id,
+                        "org_name": org["org_name"],
+                        "name": auth_result["name"],
+                        "email": auth_result["email"]
+                    }
+                )
             else:
                 print(f"Error: {authResponse.text}")
     except Exception as e:
